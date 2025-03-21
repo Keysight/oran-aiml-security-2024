@@ -21,9 +21,9 @@ from processing import PREPROCESS
 from sklearn.metrics import classification_report, f1_score
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import RandomizedSearchCV
-from mdclogpy import Logger
+from mdclogpy import Logger, Level
 
-logger = Logger(name=__name__)
+logger = Logger(name=__name__, level= Level.DEBUG)
 
 
 class ModelTraining(object):

@@ -3,7 +3,7 @@ import os
 import time
 import pandas as pd
 import schedule
-from mdclogpy import Logger
+from mdclogpy import Logger, Level
 from ad_model import modelling, CAUSE
 from ad_train import ModelTraining
 from database import DATABASE
@@ -14,7 +14,7 @@ cp = None
 threshold = None
 # sdl = SDLWrapper(use_fake_sdl=True)
 
-logger = Logger(name=__name__)
+logger = Logger(name=__name__, level=Level.DEBUG)
 
 def load_model():
     global md
