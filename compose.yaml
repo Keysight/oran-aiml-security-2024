@@ -1,0 +1,33 @@
+services:
+  influxdb1:
+    image: influxdb:1.8
+    container_name: influxdb1
+    ports:
+      - 8086:8086
+    environment:
+      # The name of your initial database
+      INFLUXDB_DB: home
+
+      # The InfluxDB admin user (you can also create separate non-admin users)
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: "zaq1@WSX"
+
+      # Enable authentication
+      INFLUXDB_HTTP_AUTH_ENABLED: "true"
+    volumes:
+      - influxdb1-data:/var/lib/influxdb
+    
+  chronograf:
+    image: chronograf:1.9
+    ports:
+      - "8889:8888"
+    depends_on:
+      - influxdb1
+    environment:
+      # The URL or hostname for the InfluxDB 1.x container
+      INFLUXDB_URL: "http://influxdb1:8086"
+      # You can set some other env variables if needed
+
+
+volumes:
+  influxdb1-data:
