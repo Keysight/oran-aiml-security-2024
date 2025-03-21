@@ -48,7 +48,7 @@ class DATABASE(object):
         fetched data from database
     """
 
-    def __init__(self, dbname='Timeseries', user='admin', password='zaq1@WSX', host="127.0.0.1", port='8086', path='', ssl=False):
+    def __init__(self, dbname='home', user='admin', password='zaq1@WSX', host="127.0.0.1", port='8086', path='', ssl=False):
         self.data = None
         self.host = host
         self.port = port
@@ -119,7 +119,7 @@ class DATABASE(object):
 
     def config(self):
         cfg = ConfigParser()
-        cfg.read('src/ad_config.ini')
+        cfg.read('/home/wysoc/isolated-ad-model/config.ini')
         for section in cfg.sections():
             if section == 'influxdb':
                 self.host = cfg.get(section, "host")
