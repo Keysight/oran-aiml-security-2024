@@ -15,9 +15,9 @@
 # ==================================================================================
 
 import joblib
-from mdclogpy import Logger
+from mdclogpy import Logger, Level
 
-logger = Logger(name=__name__)
+logger = Logger(name=__name__, level=Level.DEBUG)
 
 
 class modelling(object):

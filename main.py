@@ -3,18 +3,18 @@ import os
 import time
 import pandas as pd
 import schedule
-from mdclogpy import Logger
+from mdclogpy import Logger, Level
 from ad_model import modelling, CAUSE
 from ad_train import ModelTraining
 from database import DATABASE
-
+from datetime import datetime
 
 db = None
 cp = None
 threshold = None
 # sdl = SDLWrapper(use_fake_sdl=True)
 
-logger = Logger(name=__name__)
+logger = Logger(name=__name__, level=Level.DEBUG)
 
 def load_model():
     global md
@@ -51,7 +51,12 @@ def predict(self):
         time.sleep(1)
     if (val is not None) and (len(val) > 2):
         print("Anomaly detected!")
-        logger.info("LOG: Anomaly detected")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"src/anomaly_{timestamp}"
+
+        with open(filename + ".json", "w") as file:
+            json.dump(json.loads(val.decode('utf-8')), file, indent=4)
+
         # msg_to_ts(self, val)
 
 
@@ -165,8 +170,6 @@ class EntryClass:
         schedule.every(0.5).seconds.do(predict, self)
         while True:
             schedule.run_pending()
-
-logger.info("This log should appear.") 
 
 if __name__ == "__main__":
     logger.info("Starting application")

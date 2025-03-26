@@ -17,11 +17,11 @@ import time
 import pandas as pd
 from influxdb import DataFrameClient
 from configparser import ConfigParser
-from mdclogpy import Logger
+from mdclogpy import Logger, Level
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 from requests.exceptions import RequestException, ConnectionError
 
-logger = Logger(name=__name__)
+logger = Logger(name=__name__, level=Level.DEBUG)
 
 
 class DATABASE(object):
