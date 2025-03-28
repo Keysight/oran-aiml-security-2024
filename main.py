@@ -6,13 +6,12 @@ import schedule
 from mdclogpy import Logger, Level
 from ad_model import modelling, CAUSE
 from ad_train import ModelTraining
-from database import DATABASE
+from database import DATABASE, DUMMY
 from datetime import datetime
 
 db = None
 cp = None
 threshold = None
-# sdl = SDLWrapper(use_fake_sdl=True)
 
 logger = Logger(name=__name__, level=Level.DEBUG)
 
@@ -32,7 +31,7 @@ def train_model():
         mt.train()
 
 
-def predict(self):
+def predict():
     """Read the latest ue sample from influxDB and detects if that is anomalous or normal..
       Send the UEID, DUID, Degradation type and timestamp for the anomalous samples to Traffic Steering (rmr with the message type as 30003)
       Get the acknowledgement of sent message from the traffic steering.
@@ -43,7 +42,7 @@ def predict(self):
         if set(md.num).issubset(db.data.columns):
             db.data = db.data.dropna(axis=0)
             if len(db.data) > 0:
-                val = predict_anomaly(self, db.data)
+                val = predict_anomaly(db.data)
         else:
             logger.warning("Parameters does not match with of training data")
     else:
@@ -60,7 +59,7 @@ def predict(self):
         # msg_to_ts(self, val)
 
 
-def predict_anomaly(self, df):
+def predict_anomaly(df):
     """ calls ad_predict to detect if given sample is normal or anomalous
     find out the degradation type if sample is anomalous
     write given sample along with predicted label to AD measurement
@@ -91,22 +90,6 @@ def predict_anomaly(self, df):
     return val
 
 
-# def msg_to_ts(self, val):
-#     # send message from ad to ts
-#     logger.debug("Sending Anomalous UE to TS")
-#     success = self.rmr_send(val, 30003)
-#     if success:
-#         logger.info(" Message to TS: message sent Successfully")
-#         # rmr receive to get the acknowledgement message from the traffic steering.
-
-#     for summary, sbuf in self.rmr_get_messages():
-#         if sbuf.contents.mtype == 30004:
-#             logger.info("Received acknowldgement from TS (TS_ANOMALY_ACK): {}".format(summary))
-#         if sbuf.contents.mtype == 20010:
-#             a1_request_handler(self, summary, sbuf)
-#         self.rmr_free(sbuf)
-
-
 def connectdb(thread=False):
     # Create a connection to InfluxDB if thread=True, otherwise it will create a dummy data instance
     global db
@@ -118,60 +101,14 @@ def connectdb(thread=False):
     while not success:
         success = db.connect()
 
-
-# def a1_request_handler(self, summary, sbuf):
-#     logger.info("A1 policy received")
-#     try:
-#         req = json.loads(summary[rmr.RMR_MS_PAYLOAD])  # input should be a json encoded as bytes
-#         logger.debug("A1PolicyHandler.resp_handler:: Handler processing request")
-#     except (json.decoder.JSONDecodeError, KeyError):
-#         logger.error("A1PolicyManager.resp_handler:: Handler failed to parse request")
-#         return
-
-#     if verifyPolicy(req):
-#         logger.info("A1PolicyHandler.resp_handler:: Handler processed request: {}".format(req))
-#     else:
-#         logger.error("A1PolicyHandler.resp_handler:: Request verification failed: {}".format(req))
-#     logger.debug("A1PolicyHandler.resp_handler:: Request verification success: {}".format(req))
-#     change_threshold(self, req)
-#     resp = buildPolicyResp(self, req)
-#     self.rmr_send(json.dumps(resp).encode(), 20011)
-#     logger.info("A1PolicyHandler.resp_handler:: Response sent: {}".format(resp))
-#     self.rmr_free(sbuf)
-
-
-# def change_threshold(self, req: dict):
-#     if req["operation"] == "CREATE":
-#         payload = req["payload"]
-#         threshold = json.loads(payload)[db.a1_param]
-#         logger.info("throughput threshold parameter updated to: {}% ".format(threshold))
-
-
-# def verifyPolicy(req: dict):
-#     for i in ["policy_type_id", "operation", "policy_instance_id"]:
-#         if i not in req:
-#             return False
-#     return True
-
-
-# def buildPolicyResp(self, req: dict):
-#     req["handler_id"] = "ad"
-#     del req["operation"]
-#     del req["payload"]
-#     req["status"] = "OK"
-#     return req
-
-
-class EntryClass:
-    def entry(self):
-        connectdb()
-        train_model()
-        load_model()
-        schedule.every(0.5).seconds.do(predict, self)
-        while True:
-            schedule.run_pending()
+def main():
+    connectdb()
+    train_model()
+    load_model()
+    schedule.every(0.5).seconds.do(predict)
+    while True:
+        schedule.run_pending()
 
 if __name__ == "__main__":
     logger.info("Starting application")
-    entryObj = EntryClass()
-    entryObj.entry()
+    main()

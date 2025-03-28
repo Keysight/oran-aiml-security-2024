@@ -119,7 +119,7 @@ class DATABASE(object):
 
     def config(self):
         cfg = ConfigParser()
-        cfg.read('/home/wysoc/isolated-ad-model/config.ini')
+        cfg.read('config.ini')
         for section in cfg.sections():
             if section == 'influxdb':
                 self.host = cfg.get(section, "host")
@@ -142,23 +142,23 @@ class DATABASE(object):
                 self.a1_param = cfg.get(section, "a1_param")
 
 
-# class DUMMY(DATABASE):
+class DUMMY(DATABASE):
 
-#     def __init__(self):
-#         super().__init__()
-#         self.ue_data = pd.read_csv('src/ue.csv')
+    def __init__(self):
+        super().__init__()
+        self.ue_data = pd.read_csv('src/ue.csv')
 
-#     def connect(self):
-#         return True
+    def connect(self):
+        return True
 
-#     def read_data(self, train=False, valid=False, limit=100000):
-#         if not train:
-#             self.data = self.ue_data.head(limit)
-#         else:
-#             self.data = self.ue_data.head(limit).drop(self.anomaly, axis=1)
+    def read_data(self, train=False, valid=False, limit=100000):
+        if not train:
+            self.data = self.ue_data.head(limit)
+        else:
+            self.data = self.ue_data.head(limit).drop(self.anomaly, axis=1)
 
-#     def write_anomaly(self, df, meas_name='AD'):
-#         pass
+    def write_anomaly(self, df, meas_name='AD'):
+        pass
 
-#     def query(self, query=None):
-#         return {'UEReports': self.ue_data.head(1)}
+    def query(self, query=None):
+        return {'UEReports': self.ue_data.head(1)}
