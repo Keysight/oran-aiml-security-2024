@@ -54,8 +54,14 @@ class AnomalyRobustnessEvaluator:
         logger.info(f"Macro F1: {f1_score(true_labels, pred, average='macro', zero_division=0.0):.4f}")
         logger.info(f"Confusion Matrix:\n{cm}")
 
+    @staticmethod
+    def _save_generated_dataset(dataset, path):
+        if isinstance(dataset, pd.DataFrame) and isinstance(path, str):
+            dataset.to_csv(path, index=False)
+        else:
+            raise TypeError('This method require pandas.DataFrame and string respectively')
 
-    def test_a2pm(self):
+    def test_a2pm(self, save_adv_data = False):
         if self.model is None:
             raise ValueError("Model must be trained before testing attack")
 
@@ -102,7 +108,10 @@ class AnomalyRobustnessEvaluator:
         self.log_evaluation(pred, self.true_anomalies, "Before A2PM Attack")
         self.log_evaluation(adv_pred, self.true_anomalies, "After A2PM Attack")
 
-    def test_hsja(self):
+        if save_adv_data == True:
+            self._save_generated_dataset(adv_training_data, './ue_a2pm')
+
+    def test_hsja(self, save_adv_data = False):
         
         if self.model is None:
             raise ValueError("Model must be trained before testing attack")
@@ -128,5 +137,8 @@ class AnomalyRobustnessEvaluator:
         logger.info(f"L1 Norm {np.linalg.norm(adv_data - self.training_data[:len(adv_pred)], ord=1, axis=0)}")
         logger.info(f"L2 Norm { np.linalg.norm(adv_data - self.training_data[:len(adv_pred)], ord=2, axis=0)}")
         logger.info(f"L_inf Norm {np.linalg.norm(adv_data - self.training_data[:len(adv_pred)], ord=np.inf, axis=0)}")
+
+        if save_adv_data == True:
+            self._save_generated_dataset(adv_data, './ue_hsja')
 
 
