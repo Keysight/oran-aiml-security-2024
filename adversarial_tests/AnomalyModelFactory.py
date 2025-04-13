@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.svm import SVC
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.metrics import f1_score
 import joblib
 import logging
@@ -51,7 +52,20 @@ class AnomalyModelFactory:
         model = RandomizedSearchCV(random_forest, parameter, scoring=None, cv=None, n_iter=50)
         md = model.fit(training_data.values, true_anomalies.values)
         return md.best_estimator_
+
+    def _get_svm(self, training_data, true_anomalies):
+        parameter = {
+            'C': [0.1, 1, 10, 100],
+            'kernel': ['linear', 'rbf'],
+            'gamma': ['scale', 'auto']}
         
+        svm = SVC(class_weight='balanced')
+        kf = StratifiedKFold(n_splits=5, shuffle=False)
+        model = RandomizedSearchCV(svm, parameter, scoring='f1', cv = kf) # verify scoring function
+        md = model.fit(training_data.values, true_anomalies.values)
+
+        return md.best_estimator_
+
     def build_model(self, training_data, true_anomalies, selected_model):
 
         logger.debug(f"selected_model: {selected_model}")
@@ -59,6 +73,7 @@ class AnomalyModelFactory:
         model_dispatch = {
             "random_forest": self._get_random_forest,
             "isolation_forest": self._get_iso_forest,
+            "svm": self._get_svm,
         }
 
         if selected_model not in model_dispatch:
