@@ -72,6 +72,7 @@ class AnomalyRobustnessEvaluator:
         adv_pred = self.predict_wrapper(self.model, adv_training_data)
 
         #log results 
+        logger.info(f"Model: {self.model.__class__.__name__}")
         self.log_evaluation(pred, true_anomalies, "Before A2PM Attack")
         self.log_evaluation(adv_pred, true_anomalies, "After A2PM Attack")
 
@@ -100,6 +101,7 @@ class AnomalyRobustnessEvaluator:
         adv_pred = self.predict_wrapper(self.model, adv_data)
 
         #log results 
+        logger.info(f"Model: {self.model.__class__.__name__}") 
         self.log_evaluation(pred, true_anomalies, "Before HSJA Attack")
         self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], "After HSJA Attack")
 
