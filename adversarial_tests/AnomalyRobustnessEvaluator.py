@@ -6,6 +6,7 @@ from art.attacks.evasion import HopSkipJump
 from art.estimators.classification import BlackBoxClassifier
 from a2pm import A2PMethod
 import logging 
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,14 @@ class AnomalyRobustnessEvaluator:
     
     @staticmethod
     def predict_wrapper(model, data):
+        start_time = time.time()
         pred = model.predict(data.values)
+        predict_time = time.time() - start_time
 
         if isinstance(model, IsolationForest):
-            return [1 if p == -1 else 0 for p in pred]
+            return [1 if p == -1 else 0 for p in pred], predict_time
         else: 
-            return pred
+            return pred, predict_time
     
     @staticmethod
     def get_hsja_predict(model):
@@ -58,6 +61,23 @@ class AnomalyRobustnessEvaluator:
             dataset.to_csv(path, index=False)
         else:
             raise TypeError('This method require pandas.DataFrame and string respectively')
+        
+    @staticmethod
+    def model_timing_benchmark(test_data, repeats = 100, *args):
+        for model in args:
+            times = []
+
+            for _ in range(repeats):
+                start = time.perf_counter()
+                model.predict(test_data.values)
+                end = time.perf_counter() 
+                times.append(end - start) 
+
+            avarage_time = np.mean(times)
+            min = np.min(times)
+            max = np.max(times)
+            model_name = model.__class__.__name__
+            logger.info(f"Model: {model_name} Avg time: {avarage_time} sec avaraged over {repeats} repeats with min: {min} sec and max: {max} sec")
 
     def test_a2pm(self, test_data, true_anomalies, pattern, save_adv_data = False):
         if self.model is None:
@@ -66,15 +86,17 @@ class AnomalyRobustnessEvaluator:
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
-        pred = self.predict_wrapper(self.model, test_data)
+        pred, predict_time = self.predict_wrapper(self.model, test_data)
 
         adv_training_data = self.perform_a2pm_attack(pattern, test_data, self.model)
-        adv_pred = self.predict_wrapper(self.model, adv_training_data)
+        adv_pred, adv_predict_time = self.predict_wrapper(self.model, adv_training_data)
 
         #log results 
         logger.info(f"Model: {self.model.__class__.__name__}")
         self.log_evaluation(pred, true_anomalies, "Before A2PM Attack")
         self.log_evaluation(adv_pred, true_anomalies, "After A2PM Attack")
+
+        logger.info(f"Predict time: {predict_time} and adversarial: {adv_predict_time}")
 
         if save_adv_data == True:
             self._save_generated_dataset(adv_training_data, './ue_a2pm')
@@ -87,7 +109,7 @@ class AnomalyRobustnessEvaluator:
         if self.model is None:
             raise ValueError("Model must be trained before testing attack")
 
-        pred = self.predict_wrapper(self.model, test_data)
+        pred, predict_time = self.predict_wrapper(self.model, test_data)
 
         clip_values = (test_data.min().min(), test_data.max().max()) # Extract minimum and maximum values
         input_shape = (test_data.shape[1],)
@@ -98,7 +120,7 @@ class AnomalyRobustnessEvaluator:
         np_adv_data = hsja.generate(test_data.values[:20], max_iter=50, max_eval=10000, init_eval=100, verbose=False)
         adv_data = pd.DataFrame(np_adv_data, columns=test_data.columns)
 
-        adv_pred = self.predict_wrapper(self.model, adv_data)
+        adv_pred, adv_predict_time = self.predict_wrapper(self.model, adv_data)
 
         #log results 
         logger.info(f"Model: {self.model.__class__.__name__}") 
@@ -110,6 +132,8 @@ class AnomalyRobustnessEvaluator:
         logger.info(f"L2 Norm { np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=2, axis=0)}")
         logger.info(f"L_inf Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=np.inf, axis=0)}")
 
+        logger.info(f"Predict time: {predict_time} and adversarial: {adv_predict_time}") # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
+    
         if save_adv_data == True:
             self._save_generated_dataset(adv_data, './ue_hsja')
 

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.ensemble import IsolationForest, RandomForestClassifier, StackingClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.metrics import f1_score
@@ -14,14 +14,16 @@ class AnomalyModelFactory:
         self.model_recipe = model_recipe
         self.model = None
 
-    def save_model(self, path="model.pkl"):
-        joblib.dump(self.model, path)
+    @staticmethod
+    def save_model(model, path="model.pkl"):
+        joblib.dump(model, path)
 
-    def load_model(self, path="model.pkl"):
+    @staticmethod
+    def load_model(path="model.pkl"):
         if not os.path.exists(path):
             raise FileNotFoundError(f"No model found at {path}. Please train the model first.")
-        self.model = joblib.load(path)
-        return self.model
+        model = joblib.load(path)
+        return model
 
     @staticmethod
     def get_scorer(true_labels):
