@@ -26,23 +26,20 @@ class AnomalyModelFactory:
         return model
 
     @staticmethod
-    def get_scorer(true_labels):
-        def scorer(estimator, X):
-            pred = estimator.predict(X)
-            pred = [1 if p == -1 else 0 for p in pred]
-            return f1_score(true_labels, pred)
-        return scorer
+    def scorer(estimator, X, y):
+        pred = estimator.predict(X)
+        pred = [1 if p == -1 else 0 for p in pred]
+        return f1_score(y, pred)
         
-    def _get_iso_forest(self, training_data, true_anomalies):
+    def _get_iso_forest(self, X, y):
         random_state = 4
         parameter = {'contamination': [of for of in np.arange(0.01, 0.5, 0.02)],
                      'n_estimators': [100*(i+1) for i in range(1, 10)],
                      'max_samples': [0.005, 0.01, 0.1, 0.15, 0.2, 0.3, 0.4]}
-        cv = [(slice(None), slice(None))]
-        scorer = self.get_scorer(true_anomalies)
+        kf = StratifiedKFold(n_splits=5, shuffle=False)
         iso = IsolationForest(random_state=random_state, bootstrap=True, warm_start=False)
-        model = RandomizedSearchCV(iso, parameter, scoring=scorer, cv=cv, n_iter=50)
-        md = model.fit(training_data.values)
+        model = RandomizedSearchCV(iso, parameter, scoring=self.scorer, cv=kf, n_iter=50)
+        md = model.fit(X.values, y)
         return md.best_estimator_
     
     def _get_random_forest(self, training_data, true_anomalies):
@@ -50,8 +47,9 @@ class AnomalyModelFactory:
         parameter = {'n_estimators': [100*(i+1) for i in range(1, 12)],
                      'max_samples': [0.005, 0.01, 0.1, 0.15, 0.2, 0.3, 0.4],
                      'criterion': ["gini" , "entropy", "log_loss"]}
+        kf = StratifiedKFold(n_splits=5, shuffle=False)
         random_forest = RandomForestClassifier(random_state=random_state, bootstrap=True, warm_start=False)
-        model = RandomizedSearchCV(random_forest, parameter, scoring=None, cv=None, n_iter=50)
+        model = RandomizedSearchCV(random_forest, parameter, scoring='f1', cv=kf, n_iter=50)
         md = model.fit(training_data.values, true_anomalies.values)
         return md.best_estimator_
 
