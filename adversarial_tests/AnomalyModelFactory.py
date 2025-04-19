@@ -38,10 +38,10 @@ class AnomalyModelFactory:
         parameter = {'contamination': [of for of in np.arange(0.01, 0.5, 0.02)],
                      'n_estimators': [100*(i+1) for i in range(1, 10)],
                      'max_samples': [0.005, 0.01, 0.1, 0.15, 0.2, 0.3, 0.4]}
-        cv = [(slice(None), slice(None))]
+        kf = StratifiedKFold(n_splits=5, shuffle=False)
         scorer = self.get_scorer(true_anomalies)
         iso = IsolationForest(random_state=random_state, bootstrap=True, warm_start=False)
-        model = RandomizedSearchCV(iso, parameter, scoring=scorer, cv=cv, n_iter=50)
+        model = RandomizedSearchCV(iso, parameter, scoring=scorer, cv=kf, n_iter=50)
         md = model.fit(training_data.values)
         return md.best_estimator_
     
@@ -50,8 +50,9 @@ class AnomalyModelFactory:
         parameter = {'n_estimators': [100*(i+1) for i in range(1, 12)],
                      'max_samples': [0.005, 0.01, 0.1, 0.15, 0.2, 0.3, 0.4],
                      'criterion': ["gini" , "entropy", "log_loss"]}
+        kf = StratifiedKFold(n_splits=5, shuffle=False)
         random_forest = RandomForestClassifier(random_state=random_state, bootstrap=True, warm_start=False)
-        model = RandomizedSearchCV(random_forest, parameter, scoring=None, cv=None, n_iter=50)
+        model = RandomizedSearchCV(random_forest, parameter, scoring='f1', cv=kf, n_iter=50)
         md = model.fit(training_data.values, true_anomalies.values)
         return md.best_estimator_
 
