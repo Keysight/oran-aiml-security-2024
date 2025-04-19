@@ -15,13 +15,12 @@ class AnomalyRobustnessEvaluator:
         pass
         
     @staticmethod
-    def perform_a2pm_attack(pattern, test_data, model):
+    def perform_a2pm_attack(pattern, data, model, y = None, y_target = None):
         a2pm_method = A2PMethod(pattern)
-        a2pm_method.fit(test_data.values)
         
-        raw_adv_training_data = a2pm_method.generate(model, test_data.values)
+        raw_adv_training_data = a2pm_method.fit_generate(model, data.values, y = y, y_target= y_target)
 
-        return pd.DataFrame(raw_adv_training_data, columns=test_data.columns)
+        return pd.DataFrame(raw_adv_training_data, columns=data.columns, index=data.index)
     
     @staticmethod
     def predict_wrapper(model, data):
@@ -83,7 +82,7 @@ class AnomalyRobustnessEvaluator:
     def run_all_tests(self, model, test_data, true_anomalies, pattern, save_adv_data = False,):
         self.test_clean(model, test_data, true_anomalies)
         self.test_a2pm(model, test_data, true_anomalies, pattern, save_adv_data)
-        # self.test_hsja(model, test_data, true_anomalies, save_adv_data)
+        self.test_hsja(model, test_data, true_anomalies, save_adv_data)
 
     def test_clean(self, model, test_data, true_anomalies):
         if model is None:
@@ -119,7 +118,7 @@ class AnomalyRobustnessEvaluator:
         if save_adv_data == True:
             self._save_generated_dataset(adv_training_data, './ue_a2pm')
 
-    def test_hsja(self, model, test_data, true_anomalies, save_adv_data = False):
+    def test_hsja(self, model, test_data, true_anomalies, save_adv_data = False, number_of_samples = 20):
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
@@ -136,19 +135,15 @@ class AnomalyRobustnessEvaluator:
         classifier = BlackBoxClassifier(predict_fn=hsja_predict,input_shape=input_shape,nb_classes=2,clip_values=clip_values)
         hsja = HopSkipJump(classifier=classifier)
 
-        np_adv_data = hsja.generate(test_data.values[:20], max_iter=50, max_eval=10000, init_eval=100, verbose=False)
-        adv_data = pd.DataFrame(np_adv_data, columns=test_data.columns)
+        np_adv_data = hsja.generate(test_data.values[:number_of_samples], max_iter=25, max_eval=1000, init_eval=50, verbose=False)
+        adv_data = pd.DataFrame(np_adv_data, columns=test_data.columns, index=test_data.index[:number_of_samples])
 
         adv_pred, adv_predict_time = self.predict_wrapper(model, adv_data)
 
         self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], adv_predict_time) # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
-        test_data[:len(adv_pred)].info()
-        adv_data.info()
-
-        logger.info(adv_data.compare(test_data[:len(adv_pred)]))
-        logger.info(f"L1 Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=1, axis=0)}")
-        logger.info(f"L2 Norm { np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=2, axis=0)}")
-        logger.info(f"L_inf Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=np.inf, axis=0)}")
+        logger.info(f"L1 Norm {np.linalg.norm(adv_data - test_data[:len(adv_data)], ord=1, axis=0)}")
+        logger.info(f"L2 Norm { np.linalg.norm(adv_data - test_data[:len(adv_data)], ord=2, axis=0)}")
+        logger.info(f"L_inf Norm {np.linalg.norm(adv_data - test_data[:len(adv_data)], ord=np.inf, axis=0)}")
     
         if save_adv_data == True:
             self._save_generated_dataset(adv_data, './ue_hsja')
