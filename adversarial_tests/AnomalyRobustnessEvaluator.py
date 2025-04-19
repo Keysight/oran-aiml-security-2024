@@ -11,8 +11,8 @@ import time
 logger = logging.getLogger(__name__)
 
 class AnomalyRobustnessEvaluator:
-    def __init__(self, model):
-        self.model = model
+    def __init__(self):
+        pass
         
     @staticmethod
     def perform_a2pm_attack(pattern, test_data, model):
@@ -79,62 +79,62 @@ class AnomalyRobustnessEvaluator:
             model_name = model.__class__.__name__
             logger.info(f"Model: {model_name} Avg time: {avarage_time} sec avaraged over {repeats} repeats with min: {min} sec and max: {max} sec")
 
-    def run_all_tests(self, test_data, true_anomalies, pattern, save_adv_data = False,):
-        self.test_clean(test_data, true_anomalies)
-        self.test_a2pm(test_data, true_anomalies, pattern, save_adv_data)
-        self.test_hsja(test_data, true_anomalies, save_adv_data)
+    def run_all_tests(self, model, test_data, true_anomalies, pattern, save_adv_data = False,):
+        self.test_clean(model, test_data, true_anomalies)
+        self.test_a2pm(model, test_data, true_anomalies, pattern, save_adv_data)
+        self.test_hsja(model, test_data, true_anomalies, save_adv_data)
 
-    def test_clean(self, test_data, true_anomalies):
-        if self.model is None:
+    def test_clean(self, model, test_data, true_anomalies):
+        if model is None:
             raise ValueError("Model must be trained before testing attack")
         
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
-        pred, predict_time = self.predict_wrapper(self.model, test_data)
+        pred, predict_time = self.predict_wrapper(model, test_data)
 
-        logger.info(f"Model: {self.model.__class__.__name__}") 
+        logger.info(f"Model: {model.__class__.__name__}") 
         self.log_evaluation(pred, true_anomalies, "Clean test")
         logger.info(f"Prediction time:  {predict_time}")
 
-    def test_a2pm(self, test_data, true_anomalies, pattern, save_adv_data = False):
-        if self.model is None:
+    def test_a2pm(self, model, test_data, true_anomalies, pattern, save_adv_data = False):
+        if model is None:
             raise ValueError("Model must be trained before testing attack")
         
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
-        adv_training_data = self.perform_a2pm_attack(pattern, test_data, self.model)
-        adv_pred, adv_predict_time = self.predict_wrapper(self.model, adv_training_data)
+        adv_training_data = self.perform_a2pm_attack(pattern, test_data, model)
+        adv_pred, adv_predict_time = self.predict_wrapper(model, adv_training_data)
 
         #log results 
-        logger.info(f"Model: {self.model.__class__.__name__}")
+        logger.info(f"Model: {model.__class__.__name__}")
         self.log_evaluation(adv_pred, true_anomalies, "A2PM Attack")
         logger.info(f"Prediction time:  {adv_predict_time}")
 
         if save_adv_data == True:
             self._save_generated_dataset(adv_training_data, './ue_a2pm')
 
-    def test_hsja(self, test_data, true_anomalies, save_adv_data = False):
+    def test_hsja(self, model, test_data, true_anomalies, save_adv_data = False):
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
-        if self.model is None:
+        if model is None:
             raise ValueError("Model must be trained before testing attack")
 
         clip_values = (test_data.min().min(), test_data.max().max()) # Extract minimum and maximum values
         input_shape = (test_data.shape[1],)
-        hsja_predict = self.get_hsja_predict(self.model)
+        hsja_predict = self.get_hsja_predict(model)
         classifier = BlackBoxClassifier(predict_fn=hsja_predict,input_shape=input_shape,nb_classes=2,clip_values=clip_values)
         hsja = HopSkipJump(classifier=classifier)
 
         np_adv_data = hsja.generate(test_data.values[:20], max_iter=50, max_eval=10000, init_eval=100, verbose=False)
         adv_data = pd.DataFrame(np_adv_data, columns=test_data.columns)
 
-        adv_pred, adv_predict_time = self.predict_wrapper(self.model, adv_data)
+        adv_pred, adv_predict_time = self.predict_wrapper(model, adv_data)
 
         #log results 
-        logger.info(f"Model: {self.model.__class__.__name__}") 
+        logger.info(f"Model: {model.__class__.__name__}") 
         self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], "HSJA Attack")
 
         logger.info(adv_data.compare(test_data[:len(adv_pred)]))
