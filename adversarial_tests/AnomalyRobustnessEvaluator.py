@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import classification_report, f1_score, confusion_matrix
+from sklearn.metrics import classification_report, f1_score, roc_auc_score, precision_recall_curve, confusion_matrix
 from art.attacks.evasion import HopSkipJump
 from art.estimators.classification import BlackBoxClassifier
 from a2pm import A2PMethod
@@ -44,16 +44,17 @@ class AnomalyRobustnessEvaluator:
         return hsja_predict
     
     @staticmethod
-    def log_evaluation(pred, true_labels, description=""):
+    def log_evaluation(pred, true_labels, predict_time):
         inliers = sum(p == 0 for p in pred)
         outliers = sum(p == 1 for p in pred)
         cm = confusion_matrix(true_labels, pred)
-        
-        logger.info(f"\n--- {description} ---")
+
         logger.info(f"Inliers: {inliers}, Outliers: {outliers}")
         logger.info("Classification Report:\n" + classification_report(true_labels, pred, zero_division=0.0))
         logger.info(f"Macro F1: {f1_score(true_labels, pred, average='macro', zero_division=0.0):.4f}")
         logger.info(f"Confusion Matrix:\n{cm}")
+        logger.info(f"Prediction time:  {predict_time}")
+        logger.info("\n")
 
     @staticmethod
     def _save_generated_dataset(dataset, path):
@@ -82,7 +83,7 @@ class AnomalyRobustnessEvaluator:
     def run_all_tests(self, model, test_data, true_anomalies, pattern, save_adv_data = False,):
         self.test_clean(model, test_data, true_anomalies)
         self.test_a2pm(model, test_data, true_anomalies, pattern, save_adv_data)
-        self.test_hsja(model, test_data, true_anomalies, save_adv_data)
+        # self.test_hsja(model, test_data, true_anomalies, save_adv_data)
 
     def test_clean(self, model, test_data, true_anomalies):
         if model is None:
@@ -90,12 +91,14 @@ class AnomalyRobustnessEvaluator:
         
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
+        
+        description = "Clean Attack" 
+        logger.info(f"----{description}-----")
+        logger.info(f"Model: {model.__class__.__name__}")
 
         pred, predict_time = self.predict_wrapper(model, test_data)
 
-        logger.info(f"Model: {model.__class__.__name__}") 
-        self.log_evaluation(pred, true_anomalies, "Clean test")
-        logger.info(f"Prediction time:  {predict_time}")
+        self.log_evaluation(pred, true_anomalies, predict_time)
 
     def test_a2pm(self, model, test_data, true_anomalies, pattern, save_adv_data = False):
         if model is None:
@@ -103,14 +106,15 @@ class AnomalyRobustnessEvaluator:
         
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
+        
+        description = "A2PM Attack" 
+        logger.info(f"----{description}-----")
+        logger.info(f"Model: {model.__class__.__name__}")
 
         adv_training_data = self.perform_a2pm_attack(pattern, test_data, model)
         adv_pred, adv_predict_time = self.predict_wrapper(model, adv_training_data)
 
-        #log results 
-        logger.info(f"Model: {model.__class__.__name__}")
-        self.log_evaluation(adv_pred, true_anomalies, "A2PM Attack")
-        logger.info(f"Prediction time:  {adv_predict_time}")
+        self.log_evaluation(adv_pred, true_anomalies, adv_predict_time)
 
         if save_adv_data == True:
             self._save_generated_dataset(adv_training_data, './ue_a2pm')
@@ -121,6 +125,10 @@ class AnomalyRobustnessEvaluator:
 
         if model is None:
             raise ValueError("Model must be trained before testing attack")
+        
+        description = "HSJA Attack" 
+        logger.info(f"----{description}-----")
+        logger.info(f"Model: {model.__class__.__name__}")
 
         clip_values = (test_data.min().min(), test_data.max().max()) # Extract minimum and maximum values
         input_shape = (test_data.shape[1],)
@@ -133,16 +141,14 @@ class AnomalyRobustnessEvaluator:
 
         adv_pred, adv_predict_time = self.predict_wrapper(model, adv_data)
 
-        #log results 
-        logger.info(f"Model: {model.__class__.__name__}") 
-        self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], "HSJA Attack")
+        self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], adv_predict_time) # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
+        test_data[:len(adv_pred)].info()
+        adv_data.info()
 
         logger.info(adv_data.compare(test_data[:len(adv_pred)]))
         logger.info(f"L1 Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=1, axis=0)}")
         logger.info(f"L2 Norm { np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=2, axis=0)}")
         logger.info(f"L_inf Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=np.inf, axis=0)}")
-
-        logger.info(f"Prediction time: {adv_predict_time}") # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
     
         if save_adv_data == True:
             self._save_generated_dataset(adv_data, './ue_hsja')
