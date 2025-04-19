@@ -79,6 +79,24 @@ class AnomalyRobustnessEvaluator:
             model_name = model.__class__.__name__
             logger.info(f"Model: {model_name} Avg time: {avarage_time} sec avaraged over {repeats} repeats with min: {min} sec and max: {max} sec")
 
+    def run_all_tests(self, test_data, true_anomalies, pattern, save_adv_data = False,):
+        self.test_clean(test_data, true_anomalies)
+        self.test_a2pm(test_data, true_anomalies, pattern, save_adv_data)
+        self.test_hsja(test_data, true_anomalies, save_adv_data)
+
+    def test_clean(self, test_data, true_anomalies):
+        if self.model is None:
+            raise ValueError("Model must be trained before testing attack")
+        
+        if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
+            raise TypeError
+
+        pred, predict_time = self.predict_wrapper(self.model, test_data)
+
+        logger.info(f"Model: {self.model.__class__.__name__}") 
+        self.log_evaluation(pred, true_anomalies, "Clean test")
+        logger.info(f"Prediction time:  {predict_time}")
+
     def test_a2pm(self, test_data, true_anomalies, pattern, save_adv_data = False):
         if self.model is None:
             raise ValueError("Model must be trained before testing attack")
@@ -86,30 +104,23 @@ class AnomalyRobustnessEvaluator:
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
-        pred, predict_time = self.predict_wrapper(self.model, test_data)
-
         adv_training_data = self.perform_a2pm_attack(pattern, test_data, self.model)
         adv_pred, adv_predict_time = self.predict_wrapper(self.model, adv_training_data)
 
         #log results 
         logger.info(f"Model: {self.model.__class__.__name__}")
-        self.log_evaluation(pred, true_anomalies, "Before A2PM Attack")
-        self.log_evaluation(adv_pred, true_anomalies, "After A2PM Attack")
-
-        logger.info(f"Predict time: {predict_time} and adversarial: {adv_predict_time}")
+        self.log_evaluation(adv_pred, true_anomalies, "A2PM Attack")
+        logger.info(f"Prediction time:  {adv_predict_time}")
 
         if save_adv_data == True:
             self._save_generated_dataset(adv_training_data, './ue_a2pm')
 
     def test_hsja(self, test_data, true_anomalies, save_adv_data = False):
-        
         if not isinstance(test_data, pd.DataFrame) and not isinstance(true_anomalies, pd.DataFrame):
             raise TypeError
 
         if self.model is None:
             raise ValueError("Model must be trained before testing attack")
-
-        pred, predict_time = self.predict_wrapper(self.model, test_data)
 
         clip_values = (test_data.min().min(), test_data.max().max()) # Extract minimum and maximum values
         input_shape = (test_data.shape[1],)
@@ -124,15 +135,14 @@ class AnomalyRobustnessEvaluator:
 
         #log results 
         logger.info(f"Model: {self.model.__class__.__name__}") 
-        self.log_evaluation(pred, true_anomalies, "Before HSJA Attack")
-        self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], "After HSJA Attack")
+        self.log_evaluation(adv_pred, true_anomalies[:len(adv_pred)], "HSJA Attack")
 
         logger.info(adv_data.compare(test_data[:len(adv_pred)]))
         logger.info(f"L1 Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=1, axis=0)}")
         logger.info(f"L2 Norm { np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=2, axis=0)}")
         logger.info(f"L_inf Norm {np.linalg.norm(adv_data - test_data[:len(adv_pred)], ord=np.inf, axis=0)}")
 
-        logger.info(f"Predict time: {predict_time} and adversarial: {adv_predict_time}") # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
+        logger.info(f"Prediction time: {adv_predict_time}") # TODO: fix timing comparison - predict_time predicts on whole dataset, while adv. predic on X samples
     
         if save_adv_data == True:
             self._save_generated_dataset(adv_data, './ue_hsja')
